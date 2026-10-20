@@ -19,6 +19,8 @@
     .chapters li { padding:10px 0; }
     .chapters li.active { color:var(--accent); }
     .chapters span { display:inline-block; margin-right:12px; font:11px sans-serif; opacity:.6; }
+    .endings { margin:0 0 20px; font-size:12px; color:var(--muted); }
+    .endings span { display:block; padding-left:12px; }
     .restart { background:none; color:var(--muted); border:1px solid var(--line); padding:8px 14px; cursor:pointer; font-size:12px; }
     main { width:100%; max-width:700px; padding-top:4px; }
     .time { margin:0 0 16px; font-size:12px; color:var(--accent); letter-spacing:.12em; }
@@ -42,6 +44,8 @@
       .intro { margin:8px 0; }
       .chapters { display:flex; flex-wrap:wrap; gap:18px; padding:4px 0; margin:8px 0; }
       .chapters li { padding:2px 0; }
+      .endings { margin:8px 0 16px; }
+      .endings span { display:inline-block; padding-left:10px; white-space:nowrap; }
       #passage p { font-size:15px; }
     }
     @media (prefers-reduced-motion:reduce) { .choice { transition:none; } }
@@ -58,6 +62,7 @@
         <li id="chapter-1"><span>02</span>別れの言葉</li>
         <li id="chapter-2"><span>03</span>その後の手紙</li>
       </ol>
+      <p class="endings" id="endings"></p>
       <button class="restart" id="restart" type="button">最初から読む</button>
     </aside>
     <main>
@@ -66,14 +71,24 @@
       <div id="passage"></div>
       <div id="choices" class="choices" aria-label="次の言葉を選ぶ"></div>
       <p class="note" id="note"></p>
-      <div class="footer">読了目安：約5分 ／ 選択は自動保存されません</div>
+      <div class="footer">読了目安：約5分 ／ 読んでいる場所と読んだ結末は、このブラウザーに保存されます</div>
       <noscript>この試作を読むには、ブラウザーのJavaScriptを有効にしてください。</noscript>
     </main>
   </div>
   <script>
     'use strict';
-    // tone は最初の聞き方、route は最後の返答。仲間の行動は各手紙で描く。
+    // tone は最初の聞き方。後の場面・手紙・結末の一文を切り替える。
     let tone = '';
+    // 読んでいる場所と読んだ結末はブラウザーに保存する。保存できない環境（プライベートブラウズなど）でも読めるよう、失敗は無視する。
+    const PROGRESS_KEY = 'wakare-progress';
+    const ENDINGS_KEY = 'wakare-endings';
+    function load(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+    }
+    function save(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    }
+    let readEndings = load(ENDINGS_KEY, []);
     const scenes = {
       opening: {
         chapter:0, time:'旅の終わり・前夜', title:'買っていない切符',
@@ -222,28 +237,43 @@
       },
       ending_accompany: {
         chapter:2, time:'読了', title:'帰ってからのこと',
-        paragraphs:[
+        paragraphs:() => [
           '家に帰った日、待っていた人は「おかえり」と言った。食卓には、あなたの席も用意されていた。',
           '遅れた理由を話すと、「分かった」と答えた。それから、あなたが帰るはずだった日に何をしていたか、少しずつ話した。',
           'あなたはその話を、途中で止めずに聞いた。',
+          {
+            ask:'あの夜、レンが封筒を裏返した手つきを思い出した。話が終わるまで、あなたも膝の上の手を動かさなかった。',
+            joke:'途中で一度、いつものように軽口を挟みかけた。あの夜のレンの顔が浮かんで、あなたは口を閉じた。',
+            apology:'「遅れてすまない」と言うと、「埋め合わせはいらない」と返ってきた。どこかで聞いた言い方だと思った。'
+          }[tone],
           'レンへの返事には、無事に帰った、と書いた。四日間のことは、まだ書いていない。'
         ], choices:[{label:'最初から読む', next:'opening', reset:true}], end:true
       },
       ending_listen: {
         chapter:2, time:'読了', title:'空けておく一行',
-        paragraphs:[
+        paragraphs:() => [
           '返事に、迎えに行こうか、と書いた。しばらく眺めてから、その一行を消した。',
           '今なら行ける。けれど、あの夜には行けなかった。その違いを、レンにどう伝えればいいのか分からない。',
           '代わりに、帰り道で見た景色を書いた。あの夜に聞いた弟の話も、一つ書き添えた。',
+          {
+            ask:'家からの手紙を読んだことにも、一言だけ触れた。何が書いてあったかは、聞かなかった。',
+            joke:'最後に、いつもの軽口を一つ書きかけて、やめた。消した行は、それで二つになった。',
+            apology:'あの日の昼のことを、もう一度謝ろうかと考えた。それより先に聞くことがある気がして、書かなかった。'
+          }[tone],
           '紙には、まだ何行か余白があった。'
         ], choices:[{label:'最初から読む', next:'opening', reset:true}], end:true
       },
       ending_confront: {
         chapter:2, time:'読了', title:'返してほしいもの',
-        paragraphs:[
+        paragraphs:() => [
           '砥石は、もう要らなかった。家には新しいものがある。',
           '要らない、と書けば、レンは送り返すのをやめるだろう。都合のいい日を書けば、顔を合わせることになるかもしれない。',
           'あなたは日付を書いた。その下に、あの晩のことを謝る一文を足した。',
+          {
+            ask:'封を切らずにいたレンを思い出した。あなたはレンの手紙を、届いた日のうちに三度読んでいた。',
+            joke:'謝る一文は、少し硬い言い方になった。崩して書くと、冗談に読まれる気がした。',
+            apology:'謝るのは、これで二度目になる。昼の話と夜の話は別だと、レンは書いてきた。だから今度は、夜のことだけを書いた。'
+          }[tone],
           '返事が来るまでは、手紙を読んだときのレンの顔を、何度も想像するのだと思った。'
         ], choices:[{label:'最初から読む', next:'opening', reset:true}], end:true
       }
@@ -257,7 +287,7 @@
       const passage = document.getElementById('passage');
       passage.replaceChildren();
       const paragraphs = typeof scene.paragraphs === 'function' ? scene.paragraphs() : scene.paragraphs;
-      for (const text of paragraphs) {
+      for (const text of paragraphs.filter(Boolean)) {
         const paragraph = document.createElement('p');
         paragraph.textContent = text;
         if (scene.letter) paragraph.className = 'letter';
@@ -290,19 +320,45 @@
         if (index === scene.chapter) chapter.setAttribute('aria-current', 'step');
         else chapter.removeAttribute('aria-current');
       }
+      if (scene.end && !readEndings.includes(sceneId)) {
+        readEndings.push(sceneId);
+        save(ENDINGS_KEY, readEndings);
+      }
+      save(PROGRESS_KEY, {scene:sceneId, tone});
+      renderEndings();
       document.getElementById('note').textContent = scene.end
-        ? '試作はここまでです。別の言葉を選び直して読むこともできます。'
+        ? (readEndings.length < ENDING_IDS.length
+          ? '試作はここまでです。別の言葉を選び直すと、違う結末を読めます。'
+          : '試作はここまでです。三つの結末をすべて読みました。')
         : scene.letter ? 'これは、レンがあなたに伝えることを選んだ手紙です。' : 'クリック、またはTabキーとEnterキーで進められます。';
       if (moveFocus) {
         title.focus({preventScroll:true});
         title.scrollIntoView({block:'start', behavior:'instant'});
       }
     }
+    const ENDING_IDS = Object.keys(scenes).filter(id => scenes[id].end);
+    // 読んだ結末は題名を見せ、まだの結末は伏せる。
+    function renderEndings() {
+      const box = document.getElementById('endings');
+      box.replaceChildren(`読んだ結末　${readEndings.length} / ${ENDING_IDS.length}`);
+      for (const id of ENDING_IDS) {
+        const line = document.createElement('span');
+        line.textContent = readEndings.includes(id) ? `・${scenes[id].title}` : '・？？？';
+        box.append(line);
+      }
+    }
     document.getElementById('restart').addEventListener('click', () => {
       tone = '';
       render('opening');
     });
-    render('opening', false);
+    const progress = load(PROGRESS_KEY, null);
+    if (progress && scenes[progress.scene] && progress.scene !== 'opening') {
+      tone = progress.tone || '';
+      render(progress.scene, false);
+      document.getElementById('note').textContent = '前回の続きから表示しています。「最初から読む」で始めからに戻れます。';
+    } else {
+      render('opening', false);
+    }
   </script>
 </body>
 </html>
