@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>別れの続きを知らない — 試作</title>
+  <title>別れの続きを知らない</title>
+  <meta name="description" content="旅を終えた二人の、一夜の会話。選んだ言葉で、別れのあとが変わる。約5分の短編。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="別れの続きを知らない">
+  <meta property="og:description" content="旅を終えた二人の、一夜の会話。選んだ言葉で、別れのあとが変わる。約5分の短編。">
+  <meta property="og:url" content="https://qorigame256.github.io/ren-letter/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root { color-scheme: dark; --paper:#eee6d6; --muted:#b7ad9e; --accent:#d5a775; --line:#ffffff20; }
     * { box-sizing:border-box; }
@@ -54,7 +60,7 @@
 <body>
   <div class="layout">
     <aside aria-label="作品と章">
-      <div class="eyebrow">SHORT STORY / PROTOTYPE</div>
+      <div class="eyebrow">SHORT STORY</div>
       <h1>別れの続きを<br>知らない</h1>
       <p class="intro">旅を終えた二人の、一夜の会話。<br>あなたは、帰りを待つ人のいる旅人。</p>
       <ol class="chapters">
@@ -72,7 +78,7 @@
       <div id="choices" class="choices" aria-label="次の言葉を選ぶ"></div>
       <p class="note" id="note"></p>
       <div class="footer">読了目安：約5分 ／ 読んでいる場所と読んだ結末は、このブラウザーに保存されます</div>
-      <noscript>この試作を読むには、ブラウザーのJavaScriptを有効にしてください。</noscript>
+      <noscript>この作品を読むには、ブラウザーのJavaScriptを有効にしてください。</noscript>
     </main>
   </div>
   <script>
@@ -328,8 +334,8 @@
       renderEndings();
       document.getElementById('note').textContent = scene.end
         ? (readEndings.length < ENDING_IDS.length
-          ? '試作はここまでです。別の言葉を選び直すと、違う結末を読めます。'
-          : '試作はここまでです。三つの結末をすべて読みました。')
+          ? 'お読みいただき、ありがとうございました。別の言葉を選び直すと、違う結末を読めます。'
+          : 'お読みいただき、ありがとうございました。三つの結末をすべて読みました。')
         : scene.letter ? 'これは、レンがあなたに伝えることを選んだ手紙です。' : 'クリック、またはTabキーとEnterキーで進められます。';
       if (moveFocus) {
         title.focus({preventScroll:true});
