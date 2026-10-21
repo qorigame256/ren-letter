@@ -41,6 +41,7 @@
     .choice:hover { background:#d5a77510; border-color:var(--accent); }
     button:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
     .choice-number { color:var(--accent); font:12px/2.5 sans-serif; }
+    .phrase { display:inline-block; }
     .note { color:var(--muted); font-size:12px; margin-top:28px; }
     .footer { margin-top:40px; border-top:1px solid var(--line); padding-top:18px; font-size:11px; color:var(--muted); }
     @media (max-width:760px) {
@@ -312,8 +313,14 @@
         number.className = 'choice-number';
         number.setAttribute('aria-hidden', 'true');
         number.textContent = String(index + 1).padStart(2, '0');
+        // 句読点ごとに塊にして、狭い画面では句読点のあとで折り返す（語尾の一、二字だけが次の行に落ちないように）。
         const label = document.createElement('span');
-        label.textContent = choice.label;
+        for (const phrase of choice.label.split(/(?<=[。、])/)) {
+          const piece = document.createElement('span');
+          piece.className = 'phrase';
+          piece.textContent = phrase;
+          label.append(piece);
+        }
         button.append(number, label);
         button.addEventListener('click', () => {
           if (choice.reset) tone = '';
