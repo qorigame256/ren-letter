@@ -14,6 +14,7 @@
   <style>
     :root { color-scheme: dark; --paper:#eee6d6; --muted:#b7ad9e; --accent:#d5a775; --line:#ffffff20; }
     * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
     body { margin:0; color:var(--paper); background:#161a1c; font-family:"Yu Mincho","Hiragino Mincho ProN",serif; line-height:1.9; }
     body::before { content:""; position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at 85% 10%,#73573830,transparent 60%),linear-gradient(120deg,#1c2327,transparent); }
     button { font:inherit; }
@@ -43,6 +44,13 @@
     .choice-number { color:var(--accent); font:12px/2.5 sans-serif; }
     .phrase { display:inline-block; }
     .note { color:var(--muted); font-size:12px; margin-top:28px; }
+    .side-buttons { display:flex; flex-wrap:wrap; gap:10px; }
+    .story-list { display:grid; gap:16px; }
+    .story-card { width:100%; display:grid; gap:6px; text-align:left; border:1px solid var(--line); color:var(--paper); background:#ffffff03; padding:20px 22px; cursor:pointer; transition:background .15s,border-color .15s; }
+    .story-card:hover { background:#d5a77510; border-color:var(--accent); }
+    .story-card-title { font-size:19px; }
+    .story-card-intro { font-size:14px; color:var(--muted); }
+    .story-card-meta { font:12px/1.8 sans-serif; color:var(--accent); }
     .footer { margin-top:40px; border-top:1px solid var(--line); padding-top:18px; font-size:11px; color:var(--muted); }
     @media (max-width:760px) {
       .layout { display:block; padding:30px 22px; }
@@ -56,48 +64,50 @@
       .endings span { display:inline-block; padding-left:10px; white-space:nowrap; }
       #passage p { font-size:17px; }
     }
-    @media (prefers-reduced-motion:reduce) { .choice { transition:none; } }
+    @media (prefers-reduced-motion:reduce) { .choice, .story-card { transition:none; } }
   </style>
 </head>
 <body>
   <div class="layout">
     <aside aria-label="作品と章">
-      <div class="eyebrow">SHORT STORY</div>
-      <h1>別れの続きを<br>知らない</h1>
-      <p class="intro">旅を終えた二人の、一夜の会話。<br>あなたは、帰りを待つ人のいる旅人。</p>
-      <ol class="chapters">
-        <li id="chapter-0" class="active"><span>01</span>出発前夜</li>
-        <li id="chapter-1"><span>02</span>別れの言葉</li>
-        <li id="chapter-2"><span>03</span>その後の手紙</li>
-      </ol>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="side-title"></h1>
+      <p class="intro" id="side-intro"></p>
+      <ol class="chapters" id="chapters"></ol>
       <p class="endings" id="endings"></p>
-      <button class="restart" id="restart" type="button">最初から読む</button>
+      <div class="side-buttons">
+        <button class="restart" id="restart" type="button">最初から読む</button>
+        <button class="restart" id="to-library" type="button">作品の一覧へ</button>
+      </div>
     </aside>
     <main>
-      <p class="time" id="time"></p>
-      <h2 id="scene-title" tabindex="-1"></h2>
-      <div id="passage"></div>
-      <div id="choices" class="choices" aria-label="次の言葉を選ぶ"></div>
-      <p class="note" id="note"></p>
-      <div class="footer">読了目安：約5分 ／ 読んでいる場所と読んだ結末は、このブラウザーに保存されます</div>
+      <section id="library" hidden>
+        <h2 id="library-title" tabindex="-1">収録作品</h2>
+        <div id="story-list" class="story-list"></div>
+      </section>
+      <section id="reader">
+        <p class="time" id="time"></p>
+        <h2 id="scene-title" tabindex="-1"></h2>
+        <div id="passage"></div>
+        <div id="choices" class="choices" aria-label="次の言葉を選ぶ"></div>
+        <p class="note" id="note"></p>
+      </section>
+      <div class="footer" id="footer"></div>
       <noscript>この作品を読むには、ブラウザーのJavaScriptを有効にしてください。</noscript>
     </main>
   </div>
   <script>
     'use strict';
-    // tone は最初の聞き方。後の場面・手紙・結末の一文を切り替える。
+    // tone は話ごとの最初の選び方。後の場面・手紙・結末の一文を切り替える（1本目では最初の聞き方）。
     let tone = '';
     // 読んでいる場所と読んだ結末はブラウザーに保存する。保存できない環境（プライベートブラウズなど）でも読めるよう、失敗は無視する。
-    const PROGRESS_KEY = 'wakare-progress';
-    const ENDINGS_KEY = 'wakare-endings';
     function load(key, fallback) {
       try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
     }
     function save(key, value) {
       try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
     }
-    let readEndings = load(ENDINGS_KEY, []);
-    const scenes = {
+    const renScenes = {
       opening: {
         chapter:0, time:'旅の終わり・前夜', title:'買っていない切符',
         paragraphs:[
@@ -288,7 +298,49 @@
       }
     };
 
+    // 短編集に載せる話。並び順がそのまま一覧の順になる。
+    // progressKey・endingsKey は1本目だけ短編集にする前からの名前のまま（読者の途中の記録と読んだ結末を引き継ぐため）。変えない。
+    // tones は最初の選び方として取りうる値。最初の選び方で文を切り替えない話は [''] にする。
+    const stories = [
+      {
+        id:'ren', titleLines:['別れの続きを', '知らない'], introLines:['旅を終えた二人の、一夜の会話。', 'あなたは、帰りを待つ人のいる旅人。'],
+        minutes:5, chapters:['出発前夜', '別れの言葉', 'その後の手紙'], start:'opening', tones:['ask', 'joke', 'apology'],
+        progressKey:'wakare-progress', endingsKey:'wakare-endings',
+        letterNote:'これは、レンがあなたに伝えることを選んだ手紙です。', scenes:renScenes
+      }
+    ];
+    // 一覧の画面は話が2本以上のときだけ出す（1本のうちは今までどおり、開くとすぐ1本目）。
+    // 短編集の題名は2本目を載せるときに本人が決める。それまでの仮の値で、画面には出ない。
+    const COLLECTION = {titleLines:['（短編集の題名・未定）'], introLines:['何かが終わる前の、一夜の話。']};
+    const NUMBERS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    const SAVE_NOTE = '読んでいる場所と読んだ結末は、このブラウザーに保存されます';
+    let story = null; // いま読んでいる話。一覧を出している間は null
+    let readEndings = [];
+    const $ = id => document.getElementById(id);
+    const titleOf = s => s.titleLines.join('');
+    const endingIds = s => Object.keys(s.scenes).filter(id => s.scenes[id].end);
+    // 保存データが壊れている・古い場面名が残っているときに止まらないよう、今ある結末だけを重複なしで数える。
+    function loadEndings(s) {
+      const ids = endingIds(s);
+      const saved = load(s.endingsKey, []);
+      return Array.isArray(saved) ? [...new Set(saved.filter(id => ids.includes(id)))] : [];
+    }
+    // 続きから開くのは、場面名と最初の選び方の両方が今の作品に合うときだけ。合わなければ null（最初から）。
+    function loadProgress(s) {
+      const progress = load(s.progressKey, null);
+      return progress && typeof progress.scene === 'string' && Object.hasOwn(s.scenes, progress.scene)
+        && progress.scene !== s.start && s.tones.includes(progress.tone) ? progress : null;
+    }
+    function setLines(element, lines) {
+      element.replaceChildren();
+      lines.forEach((line, index) => {
+        if (index) element.append(document.createElement('br'));
+        element.append(line);
+      });
+    }
+
     function render(sceneId, moveFocus = true) {
+      const scenes = story.scenes;
       const scene = scenes[sceneId];
       const title = document.getElementById('scene-title');
       document.getElementById('time').textContent = scene.time;
@@ -329,23 +381,24 @@
         });
         choices.append(button);
       });
-      for (let index = 0; index < 3; index++) {
-        const chapter = document.getElementById(`chapter-${index}`);
+      story.chapters.forEach((name, index) => {
+        const chapter = $(`chapter-${index}`);
         chapter.classList.toggle('active', index === scene.chapter);
         if (index === scene.chapter) chapter.setAttribute('aria-current', 'step');
         else chapter.removeAttribute('aria-current');
-      }
+      });
       if (scene.end && !readEndings.includes(sceneId)) {
         readEndings.push(sceneId);
-        save(ENDINGS_KEY, readEndings);
+        save(story.endingsKey, readEndings);
       }
-      save(PROGRESS_KEY, {scene:sceneId, tone});
+      save(story.progressKey, {scene:sceneId, tone});
       renderEndings();
-      document.getElementById('note').textContent = scene.end
-        ? (readEndings.length < ENDING_IDS.length
+      const endingCount = endingIds(story).length;
+      $('note').textContent = scene.end
+        ? (readEndings.length < endingCount
           ? 'お読みいただき、ありがとうございました。別の言葉を選び直すと、違う結末を読めます。'
-          : 'お読みいただき、ありがとうございました。三つの結末をすべて読みました。')
-        : scene.letter ? 'これは、レンがあなたに伝えることを選んだ手紙です。' : '選択肢を選ぶと進みます。';
+          : `お読みいただき、ありがとうございました。${NUMBERS[endingCount] ?? endingCount}つの結末をすべて読みました。`)
+        : scene.letter ? story.letterNote : '選択肢を選ぶと進みます。';
       // 場面が変わったら、本文と選択肢をふわっと出す。動きを減らす設定の端末では出さない。
       if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
         for (const element of [document.getElementById('time'), title, passage, choices]) {
@@ -357,34 +410,96 @@
         title.scrollIntoView({block:'start', behavior:'instant'});
       }
     }
-    const ENDING_IDS = Object.keys(scenes).filter(id => scenes[id].end);
-    const TONES = ['ask', 'joke', 'apology'];
-    // 保存データが壊れている・古い場面名が残っているときに止まらないよう、今ある結末だけを重複なしで数える。
-    readEndings = Array.isArray(readEndings) ? [...new Set(readEndings.filter(id => ENDING_IDS.includes(id)))] : [];
     // 読んだ結末は題名を見せ、まだの結末は伏せる。
     function renderEndings() {
-      const box = document.getElementById('endings');
-      box.replaceChildren(`読んだ結末　${readEndings.length} / ${ENDING_IDS.length}`);
-      for (const id of ENDING_IDS) {
+      const ids = endingIds(story);
+      const box = $('endings');
+      box.replaceChildren(`読んだ結末　${readEndings.length} / ${ids.length}`);
+      for (const id of ids) {
         const line = document.createElement('span');
-        line.textContent = readEndings.includes(id) ? `・${scenes[id].title}` : '・？？？';
+        line.textContent = readEndings.includes(id) ? `・${story.scenes[id].title}` : '・？？？';
         box.append(line);
       }
     }
-    document.getElementById('restart').addEventListener('click', () => {
-      tone = '';
-      render('opening');
-    });
-    const progress = load(PROGRESS_KEY, null);
-    // 続きから開くのは、場面名と最初の選び方の両方が今の作品に合うときだけ。合わなければ最初から。
-    if (progress && typeof progress.scene === 'string' && Object.hasOwn(scenes, progress.scene)
-        && progress.scene !== 'opening' && TONES.includes(progress.tone)) {
-      tone = progress.tone;
-      render(progress.scene, false);
-      document.getElementById('note').textContent = '前回の続きから表示しています。「最初から読む」で始めからに戻れます。';
-    } else {
-      render('opening', false);
+    // 横の欄の、話を読んでいる間だけ出すもの。
+    function showStoryParts(visible) {
+      for (const id of ['chapters', 'endings', 'restart', 'reader']) $(id).hidden = !visible;
+      $('to-library').hidden = !visible || stories.length < 2;
+      $('library').hidden = visible;
     }
+    function openStory(s, moveFocus = true) {
+      story = s;
+      readEndings = loadEndings(s);
+      $('eyebrow').textContent = 'SHORT STORY';
+      setLines($('side-title'), s.titleLines);
+      setLines($('side-intro'), s.introLines);
+      const list = $('chapters');
+      list.replaceChildren();
+      s.chapters.forEach((name, index) => {
+        const chapter = document.createElement('li');
+        chapter.id = `chapter-${index}`;
+        const number = document.createElement('span');
+        number.textContent = String(index + 1).padStart(2, '0');
+        chapter.append(number, name);
+        list.append(chapter);
+      });
+      showStoryParts(true);
+      $('footer').textContent = `読了目安：約${s.minutes}分 ／ ${SAVE_NOTE}`;
+      document.title = stories.length < 2 ? titleOf(s) : `${titleOf(s)} ｜ ${titleOf(COLLECTION)}`;
+      const progress = loadProgress(s);
+      tone = progress ? progress.tone : '';
+      render(progress ? progress.scene : s.start, moveFocus);
+      if (progress) $('note').textContent = '前回の続きから表示しています。「最初から読む」で始めからに戻れます。';
+    }
+    function showLibrary(moveFocus = true) {
+      story = null;
+      $('eyebrow').textContent = 'SHORT STORIES';
+      setLines($('side-title'), COLLECTION.titleLines);
+      setLines($('side-intro'), COLLECTION.introLines);
+      showStoryParts(false);
+      $('footer').textContent = SAVE_NOTE;
+      document.title = titleOf(COLLECTION);
+      const list = $('story-list');
+      list.replaceChildren();
+      for (const s of stories) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'story-card';
+        const meta = [`約${s.minutes}分`, `読んだ結末 ${loadEndings(s).length} / ${endingIds(s).length}`];
+        if (loadProgress(s)) meta.push('続きから');
+        for (const [className, text] of [['story-card-title', titleOf(s)], ['story-card-intro', s.introLines.join('')], ['story-card-meta', meta.join(' ／ ')]]) {
+          const part = document.createElement('span');
+          part.className = className;
+          part.textContent = text;
+          card.append(part);
+        }
+        card.addEventListener('click', () => {
+          history.pushState(null, '', `#${s.id}`);
+          openStory(s);
+        });
+        list.append(card);
+      }
+      if (moveFocus) {
+        $('library-title').focus({preventScroll:true});
+        scrollTo({top:0, behavior:'instant'});
+      }
+    }
+    // URL の末尾（#ren など）で話を指せる。話が1本のうちは何が付いていても1本目を開く。
+    function route(moveFocus) {
+      const target = stories.length < 2 ? stories[0] : stories.find(s => location.hash === `#${s.id}`);
+      if (target) openStory(target, moveFocus);
+      else showLibrary(moveFocus);
+    }
+    $('restart').addEventListener('click', () => {
+      tone = '';
+      render(story.start);
+    });
+    $('to-library').addEventListener('click', () => {
+      history.pushState(null, '', location.pathname + location.search);
+      showLibrary();
+    });
+    addEventListener('popstate', () => route(true));
+    route(false);
   </script>
 </body>
 </html>
