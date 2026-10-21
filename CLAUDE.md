@@ -12,8 +12,7 @@
 - **GitHub Pages で公開する**（共通ルールの既定どおり）。リポジトリは `qorigame256/ren-letter`（公開）、
   URL は `https://qorigame256.github.io/ren-letter/`（名前は 2026-10-21 本人決定）。
   共有カードは文字だけ（題名と紹介文。画像なし。2026-10-21 本人決定）。`app/index.html` の `og:url` はこの URL を指す。
-  **2026-10-21 時点で未公開。** GitHub でのリポジトリ作成と Pages の設定（Source を GitHub Actions に）を本人が後でやる。
-  済んだと聞いたら `timeout 60 git push -u origin main` で送り、公開ページの中身を確かめてから、この2行を消す。
+  2026-10-21 に公開済み。直したら `timeout 60 git push origin main` で送るだけで公開ページも更新される。
 
 ## ファイル
 
