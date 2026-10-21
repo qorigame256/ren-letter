@@ -351,6 +351,9 @@
       }
     }
     const ENDING_IDS = Object.keys(scenes).filter(id => scenes[id].end);
+    const TONES = ['ask', 'joke', 'apology'];
+    // 保存データが壊れている・古い場面名が残っているときに止まらないよう、今ある結末だけを重複なしで数える。
+    readEndings = Array.isArray(readEndings) ? [...new Set(readEndings.filter(id => ENDING_IDS.includes(id)))] : [];
     // 読んだ結末は題名を見せ、まだの結末は伏せる。
     function renderEndings() {
       const box = document.getElementById('endings');
@@ -366,8 +369,10 @@
       render('opening');
     });
     const progress = load(PROGRESS_KEY, null);
-    if (progress && scenes[progress.scene] && progress.scene !== 'opening') {
-      tone = progress.tone || '';
+    // 続きから開くのは、場面名と最初の選び方の両方が今の作品に合うときだけ。合わなければ最初から。
+    if (progress && typeof progress.scene === 'string' && Object.hasOwn(scenes, progress.scene)
+        && progress.scene !== 'opening' && TONES.includes(progress.tone)) {
+      tone = progress.tone;
       render(progress.scene, false);
       document.getElementById('note').textContent = '前回の続きから表示しています。「最初から読む」で始めからに戻れます。';
     } else {
